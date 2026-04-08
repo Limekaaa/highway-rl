@@ -1,0 +1,17 @@
+{
+  "batch_size": 64,
+  "buffer_size": 50000,
+  "device": "cuda",
+  "exploration_final_eps": 0.02,
+  "exploration_fraction": 0.3,
+  "exploration_initial_eps": 1.0,
+  "gamma": 0.99,
+  "gradient_steps": 1,
+  "learning_rate": 0.0001,
+  "learning_starts": 5000,
+  "seed": 42,
+  "target_update_interval": 2000,
+  "tensorboard_log": null,
+  "train_freq": 4,
+  "verbose": 1
+}

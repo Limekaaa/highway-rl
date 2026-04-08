@@ -10,12 +10,76 @@ import gymnasium as gym
 import highway_env  # noqa: F401
 import numpy as np
 import torch
+import torch.nn as nn
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 
-from shared_core_config import CNN_TRAIN_CONFIG, CNN_CORE_CONFIG, SHARED_CORE_ENV_ID
+from shared_core_config import CNN_TRAIN_CONFIG, SHARED_CORE_ENV_ID
+
+
+class CustomCNNFeatureExtractor(BaseFeaturesExtractor):
+    """
+    Custom CNN feature extractor for 4-channel (stacked frames) observations.
+    Processes temporal continuity through stacked grayscale frames.
+    """
+
+    def __init__(self, observation_space, features_dim: int = 512):
+        super().__init__(observation_space, features_dim)
+        # observation_space.shape = (4, 180, 64) for 4 stacked frames
+        n_input_channels = observation_space.shape[0]  # Should be 4
+
+        self.cnn = nn.Sequential(
+            # Block 1: Extract low-level features
+            nn.Conv2d(
+                n_input_channels, 64, kernel_size=8, stride=4, padding=0
+            ),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            # Block 2: Deeper feature extraction
+            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            # Block 3: High-level feature extraction
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            # Block 4: Final convolutional layer
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+
+        # Calculate flattened dimension dynamically
+        with torch.no_grad():
+            test_input = torch.zeros(
+                1, n_input_channels, 
+                observation_space.shape[1], 
+                observation_space.shape[2]
+            )
+            n_flatten = self.cnn(test_input).shape[1]
+
+        # Fully connected layers for final feature extraction
+        self.linear = nn.Sequential(
+            nn.Linear(n_flatten, features_dim),
+            nn.ReLU(),
+            nn.Dropout(p=0.1),
+        )
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through CNN and linear layers.
+        Args:
+            observations: Tensor of shape (batch, 4, 180, 64)
+        Returns:
+            features: Tensor of shape (batch, features_dim)
+        """
+        return self.linear(self.cnn(observations))
 
 
 def set_global_seed(seed: int) -> None:
@@ -75,14 +139,14 @@ def build_cnn_hparams(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
+def train_cnn_homemade(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     set_global_seed(args.seed)
 
     output_dir = Path(args.output_dir)
-    run_dir = _build_run_dir(output_dir=output_dir, model_name="cnn", run_name=args.run_name)
+    run_dir = _build_run_dir(output_dir=output_dir, model_name="cnn_homemade", run_name=args.run_name)
 
     train_config = dict(CNN_TRAIN_CONFIG)
-    eval_config = dict(CNN_CORE_CONFIG)
+    eval_config = dict(CNN_TRAIN_CONFIG)
     hparams = build_cnn_hparams(args)
 
     _json_dump(run_dir / "train_config.json", train_config)
@@ -90,21 +154,29 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     _json_dump(run_dir / "hparams.json", hparams)
 
     with (run_dir / "command.txt").open("w", encoding="utf-8") as f:
-        f.write("python cnn_model.py ...\n")
+        f.write("python cnn_model_homemade.py ...\n")
 
     train_env = make_vec_env(train_config)
     eval_env = make_vec_env(eval_config)
 
+    # Custom policy kwargs with our feature extractor
+    policy_kwargs = dict(
+        features_extractor_class=CustomCNNFeatureExtractor,
+        features_extractor_kwargs=dict(features_dim=512),
+        net_arch=[512, 512],  # Additional hidden layers for Q-network
+    )
+
     model = DQN(
         policy="CnnPolicy",
         env=train_env,
+        policy_kwargs=policy_kwargs,
         **hparams,
     )
 
     checkpoint_cb = CheckpointCallback(
         save_freq=max(1, args.checkpoint_freq),
         save_path=str(run_dir / "checkpoints"),
-        name_prefix="dqn_cnn",
+        name_prefix="dqn_cnn_homemade",
         save_replay_buffer=True,
         save_vecnormalize=False,
     )
@@ -178,6 +250,8 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
         f.write("- checkpoints/: periodic checkpoints\n")
         f.write("- replay_buffer.pkl: replay buffer snapshot for warm restart\n")
         f.write("- train_config.json, eval_config.json, hparams.json, metrics.json\n")
+        f.write("\nModel: Custom CNN with 4-channel temporal continuity\n")
+        f.write("Feature extractor: CustomCNNFeatureExtractor (512 features)\n")
 
     train_env.close()
     eval_env.close()
@@ -185,7 +259,9 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Train CNN DQN on highway-env image observations.")
+    parser = argparse.ArgumentParser(
+        description="Train custom CNN DQN on highway-env with temporal continuity (4-channel stacked frames)."
+    )
     parser.add_argument("--output-dir", type=str, default="results")
     parser.add_argument("--run-name", type=str, default=None)
     parser.add_argument("--total-timesteps", type=int, default=300_000)
@@ -213,7 +289,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
-    run_dir, metrics = train_cnn(args)
+    run_dir, metrics = train_cnn_homemade(args)
 
     print("=" * 80)
     print(f"Run dir: {run_dir}")

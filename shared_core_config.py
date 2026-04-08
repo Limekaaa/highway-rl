@@ -80,10 +80,10 @@ CNN_TRAIN_CONFIG = {
     "ego_spacing": 2,
     "vehicles_density": 1.5,
     # Stronger crash penalty discourages trivial unsafe policies.
-    "collision_reward": -3.0,
+    "collision_reward": -1.5,
     "right_lane_reward": 0.15,
     "high_speed_reward": 0.45,
-    "lane_change_reward": -0.005,
+    "lane_change_reward": -0.001,
     "reward_speed_range": [20, 32],
     "normalize_reward": False,
     "offroad_terminal": True,

@@ -1,0 +1,41 @@
+{
+  "action": {
+    "target_speeds": [
+      20,
+      25,
+      30
+    ],
+    "type": "DiscreteMetaAction"
+  },
+  "collision_reward": -3.0,
+  "controlled_vehicles": 1,
+  "duration": 40,
+  "ego_spacing": 2,
+  "high_speed_reward": 0.45,
+  "initial_lane_id": null,
+  "lane_change_reward": -0.005,
+  "lanes_count": 4,
+  "normalize_reward": false,
+  "observation": {
+    "observation_shape": [
+      180,
+      64
+    ],
+    "scaling": 1.75,
+    "stack_size": 4,
+    "type": "GrayscaleObservation",
+    "weights": [
+      0.2989,
+      0.587,
+      0.114
+    ]
+  },
+  "offroad_terminal": true,
+  "reward_speed_range": [
+    20,
+    32
+  ],
+  "right_lane_reward": 0.15,
+  "vehicles_count": 45,
+  "vehicles_density": 1.5
+}
