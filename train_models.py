@@ -15,7 +15,8 @@ from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback,
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 
-from cnn_model import build_cnn_hparams, train_cnn
+from cnn_model import train_cnn
+from cnn_model_homemade import train_cnn_homemade
 from shared_core_config import CNN_TRAIN_CONFIG, SHARED_CORE_CONFIG, SHARED_CORE_ENV_ID
 
 
@@ -188,7 +189,7 @@ def train_dqn_mlp(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train RL models for highway-env from CLI.")
-    parser.add_argument("--model", type=str, choices=["cnn", "dqn"], required=True)
+    parser.add_argument("--model", type=str, choices=["cnn", "cnn_homemade", "dqn"], required=True)
     parser.add_argument("--output-dir", type=str, default="results")
     parser.add_argument("--run-name", type=str, default=None)
 
@@ -222,6 +223,8 @@ def main() -> None:
     if args.model == "cnn":
         # Reuse the dedicated CNN pipeline.
         run_dir, metrics = train_cnn(args)
+    elif args.model == "cnn_homemade":
+        run_dir, metrics = train_cnn_homemade(args)
     else:
         run_dir, metrics = train_dqn_mlp(args)
 
