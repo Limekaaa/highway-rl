@@ -4,4 +4,4 @@ numpy
 highway-env
 torch
 tqdm
-stable-baselines3
+stable-baselines3[extra]

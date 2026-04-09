@@ -1,4 +1,5 @@
 import argparse
+import copy
 import json
 import random
 import time
@@ -13,7 +14,7 @@ import torch
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
+from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
 
 from shared_core_config import CNN_TRAIN_CONFIG, CNN_CORE_CONFIG, SHARED_CORE_ENV_ID
 
@@ -35,10 +36,11 @@ def make_env(config: Dict[str, Any], render_mode: str | None = None):
     return env
 
 
-def make_vec_env(config: Dict[str, Any]):
+# Frame stacking wrapper for CNN observations. Uses VecFrameStack from SB3 which stacks along the channel dimension.
+def make_vec_env(config: Dict[str, Any], n_stack: int = 4):
     vec_env = DummyVecEnv([lambda: make_env(config, render_mode=None)])
-    if len(vec_env.observation_space.shape) == 3 and vec_env.observation_space.shape[-1] in (1, 3, 4):
-        vec_env = VecTransposeImage(vec_env)
+    if len(vec_env.observation_space.shape) == 3 and n_stack > 1:
+        vec_env = VecFrameStack(vec_env, n_stack=n_stack, channels_order="first")
     return vec_env
 
 
@@ -81,8 +83,12 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     output_dir = Path(args.output_dir)
     run_dir = _build_run_dir(output_dir=output_dir, model_name="cnn", run_name=args.run_name)
 
-    train_config = dict(CNN_TRAIN_CONFIG)
-    eval_config = dict(CNN_CORE_CONFIG)
+    train_config = copy.deepcopy(CNN_TRAIN_CONFIG)
+    eval_config = copy.deepcopy(CNN_CORE_CONFIG)
+
+    # Use VecFrameStack for temporal stacking and keep env output to single frame.
+    train_config["observation"]["stack_size"] = 1
+    eval_config["observation"]["stack_size"] = 1
     hparams = build_cnn_hparams(args)
 
     _json_dump(run_dir / "train_config.json", train_config)
@@ -92,8 +98,8 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     with (run_dir / "command.txt").open("w", encoding="utf-8") as f:
         f.write("python cnn_model.py ...\n")
 
-    train_env = make_vec_env(train_config)
-    eval_env = make_vec_env(eval_config)
+    train_env = make_vec_env(train_config, n_stack=args.frame_stack)
+    eval_env = make_vec_env(eval_config, n_stack=args.frame_stack)
 
     model = DQN(
         policy="CnnPolicy",
@@ -203,6 +209,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--eval-freq", type=int, default=10_000)
     parser.add_argument("--eval-episodes", type=int, default=20)
     parser.add_argument("--checkpoint-freq", type=int, default=25_000)
+    parser.add_argument("--frame-stack", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--verbose", type=int, default=1)

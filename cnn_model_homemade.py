@@ -17,7 +17,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 
-from shared_core_config import CNN_TRAIN_CONFIG, SHARED_CORE_ENV_ID
+from shared_core_config import CNN_TRAIN_CONFIG, CNN_CORE_CONFIG, SHARED_CORE_ENV_ID
 
 
 class CustomCNNFeatureExtractor(BaseFeaturesExtractor):
@@ -34,23 +34,13 @@ class CustomCNNFeatureExtractor(BaseFeaturesExtractor):
         self.cnn = nn.Sequential(
             # Block 1: Extract low-level features
             nn.Conv2d(
-                n_input_channels, 64, kernel_size=8, stride=4, padding=0
+                n_input_channels, 32, kernel_size=8, stride=4, padding=0
             ),
             nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
             # Block 2: Deeper feature extraction
-            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            # Block 3: High-level feature extraction
-            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            # Block 4: Final convolutional layer
-            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=0),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0),
             nn.ReLU(),
             nn.Flatten(),
         )
@@ -68,7 +58,8 @@ class CustomCNNFeatureExtractor(BaseFeaturesExtractor):
         self.linear = nn.Sequential(
             nn.Linear(n_flatten, features_dim),
             nn.ReLU(),
-            nn.Dropout(p=0.1),
+            # # Régularisation
+            # nn.Dropout(p=0.1),
         )
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
@@ -146,7 +137,7 @@ def train_cnn_homemade(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     run_dir = _build_run_dir(output_dir=output_dir, model_name="cnn_homemade", run_name=args.run_name)
 
     train_config = dict(CNN_TRAIN_CONFIG)
-    eval_config = dict(CNN_TRAIN_CONFIG)
+    eval_config = dict(CNN_CORE_CONFIG)
     hparams = build_cnn_hparams(args)
 
     _json_dump(run_dir / "train_config.json", train_config)
