@@ -5,16 +5,19 @@ import random
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
+
+import os
+import multiprocessing
+import platform
 
 import gymnasium as gym
-import highway_env  # noqa: F401
 import numpy as np
 import torch
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecFrameStack, VecTransposeImage
 
 from shared_core_config import CNN_TRAIN_CONFIG, CNN_CORE_CONFIG, SHARED_CORE_ENV_ID
 
@@ -27,7 +30,7 @@ def set_global_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-def make_env(config: Dict[str, Any], render_mode: str | None = None):
+def make_env(config: Dict[str, Any], render_mode: Optional[str] = None):
     env = gym.make(SHARED_CORE_ENV_ID, config=config, render_mode=render_mode)
     env.reset(seed=None)
     if render_mode == "rgb_array":
@@ -35,12 +38,15 @@ def make_env(config: Dict[str, Any], render_mode: str | None = None):
         env.unwrapped.config["offscreen_rendering"] = True
     return env
 
-
 # Frame stacking wrapper for CNN observations. Uses VecFrameStack from SB3 which stacks along the channel dimension.
-def make_vec_env(config: Dict[str, Any], n_stack: int = 4):
-    vec_env = DummyVecEnv([lambda: make_env(config, render_mode=None)])
-    if len(vec_env.observation_space.shape) == 3 and n_stack > 1:
-        vec_env = VecFrameStack(vec_env, n_stack=n_stack, channels_order="first")
+def make_vec_env(config: Dict[str, Any], n_envs: int, n_stack: int):
+    def make_env_fn():
+        def _init():
+            return make_env(config, render_mode=None)
+        return _init
+    env_fns = [make_env_fn() for _ in range(n_envs)]
+    vec_env = SubprocVecEnv(env_fns)
+    vec_env = VecFrameStack(vec_env, n_stack=n_stack, channels_order="first") # Output (C, H, W)
     return vec_env
 
 
@@ -50,7 +56,7 @@ def _json_dump(path: Path, payload: Dict[str, Any]) -> None:
         json.dump(payload, f, indent=2, sort_keys=True)
 
 
-def _build_run_dir(output_dir: Path, model_name: str, run_name: str | None) -> Path:
+def _build_run_dir(output_dir: Path, model_name: str, run_name: Optional[str]) -> Path:
     tag = run_name or datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = output_dir / f"{model_name}_{tag}"
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -86,7 +92,10 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     train_config = copy.deepcopy(CNN_TRAIN_CONFIG)
     eval_config = copy.deepcopy(CNN_CORE_CONFIG)
 
-    # Use VecFrameStack for temporal stacking and keep env output to single frame.
+    # Single source of truth: read desired temporal depth from config.
+    frame_stack = int(train_config["observation"].get("stack_size", 4))
+
+    # Keep env output to a single frame, then apply stacking only through VecFrameStack.
     train_config["observation"]["stack_size"] = 1
     eval_config["observation"]["stack_size"] = 1
     hparams = build_cnn_hparams(args)
@@ -98,8 +107,10 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     with (run_dir / "command.txt").open("w", encoding="utf-8") as f:
         f.write("python cnn_model.py ...\n")
 
-    train_env = make_vec_env(train_config, n_stack=args.frame_stack)
-    eval_env = make_vec_env(eval_config, n_stack=args.frame_stack)
+    # Nombre d'envs en parallèles pour le training.
+    n_envs_train = 16
+    train_env = make_vec_env(train_config, n_envs=n_envs_train, n_stack=frame_stack)
+    eval_env = make_vec_env(eval_config, n_envs=1, n_stack=frame_stack)
 
     model = DQN(
         policy="CnnPolicy",
@@ -194,24 +205,23 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train CNN DQN on highway-env image observations.")
     parser.add_argument("--output-dir", type=str, default="results")
     parser.add_argument("--run-name", type=str, default=None)
-    parser.add_argument("--total-timesteps", type=int, default=300_000)
+    parser.add_argument("--total-timesteps", type=int, default=500_000)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--buffer-size", type=int, default=50_000)
     parser.add_argument("--learning-starts", type=int, default=5_000)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--train-freq", type=int, default=4)
+    parser.add_argument("--train-freq", type=int, default=2)
     parser.add_argument("--gradient-steps", type=int, default=1)
-    parser.add_argument("--target-update-interval", type=int, default=2_000)
-    parser.add_argument("--exploration-fraction", type=float, default=0.3)
+    parser.add_argument("--target-update-interval", type=int, default=5_000)
+    parser.add_argument("--exploration-fraction", type=float, default=0.5)
     parser.add_argument("--exploration-initial-eps", type=float, default=1.0)
-    parser.add_argument("--exploration-final-eps", type=float, default=0.02)
+    parser.add_argument("--exploration-final-eps", type=float, default=0.05)
     parser.add_argument("--eval-freq", type=int, default=10_000)
     parser.add_argument("--eval-episodes", type=int, default=20)
     parser.add_argument("--checkpoint-freq", type=int, default=25_000)
-    parser.add_argument("--frame-stack", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--verbose", type=int, default=1)
     parser.add_argument("--no-progress-bar", action="store_true")
     return parser
@@ -220,14 +230,66 @@ def _build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
+
+    # -------------------------
+    # SYSTEM INFO
+    # -------------------------
+    print("\n" + "=" * 80)
+    print("SYSTEM INFO")
+
+    print(f"OS: {platform.system()} {platform.release()}")
+    print(f"Python processes (CPU cores): {multiprocessing.cpu_count()}")
+
+    # PyTorch device info
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"PyTorch device: {device}")
+
+    if torch.cuda.is_available():
+        print(f"GPU name: {torch.cuda.get_device_name(0)}")
+        print(f"CUDA version: {torch.version.cuda}")
+        print(f"CUDA devices: {torch.cuda.device_count()}")
+    else:
+        print("No GPU detected")
+
+    # CPU threading info (important for SB3 + envs)
+    print(f"PyTorch threads (intra-op): {torch.get_num_threads()}")
+
+    # Env vars (useful for debugging performance)
+    print(f"OMP_NUM_THREADS: {os.environ.get('OMP_NUM_THREADS')}")
+    print(f"MKL_NUM_THREADS: {os.environ.get('MKL_NUM_THREADS')}")
+
+    print("=" * 80 + "\n")
+
+    # -------------------------
+    # TRAINING
+    # -------------------------
     run_dir, metrics = train_cnn(args)
 
+    # -------------------------
+    # RESULTS
+    # -------------------------
     print("=" * 80)
     print(f"Run dir: {run_dir}")
     print(f"Final mean reward: {metrics['final_mean_reward']:.3f} +/- {metrics['final_std_reward']:.3f}")
+
     if metrics["best_mean_reward"] is not None:
         print(f"Best  mean reward: {metrics['best_mean_reward']:.3f} +/- {metrics['best_std_reward']:.3f}")
+
     print("=" * 80)
+
+    summary = {
+        "model": getattr(args, "model", "cnn"),
+        "run_dir": str(run_dir),
+        "device_used": device,
+        "cpu_cores": multiprocessing.cpu_count(),
+        "torch_threads": torch.get_num_threads(),
+        "final_mean_reward": metrics["final_mean_reward"],
+        "final_std_reward": metrics["final_std_reward"],
+        "best_mean_reward": metrics["best_mean_reward"],
+        "best_std_reward": metrics["best_std_reward"],
+    }
+
+    print(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":
