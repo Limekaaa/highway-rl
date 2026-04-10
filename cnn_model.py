@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import os
-import multiprocessing
+import multiprocessing as mp
 import platform
 
 import gymnasium as gym
@@ -293,4 +293,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    mp.set_start_method("fork")
     main()
