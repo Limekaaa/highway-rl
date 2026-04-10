@@ -238,7 +238,7 @@ def main() -> None:
     print("SYSTEM INFO")
 
     print(f"OS: {platform.system()} {platform.release()}")
-    print(f"Python processes (CPU cores): {multiprocessing.cpu_count()}")
+    print(f"Python processes (CPU cores): {mp.cpu_count()}")
 
     # PyTorch device info
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -281,7 +281,7 @@ def main() -> None:
         "model": getattr(args, "model", "cnn"),
         "run_dir": str(run_dir),
         "device_used": device,
-        "cpu_cores": multiprocessing.cpu_count(),
+        "cpu_cores": mp.cpu_count(),
         "torch_threads": torch.get_num_threads(),
         "final_mean_reward": metrics["final_mean_reward"],
         "final_std_reward": metrics["final_std_reward"],
