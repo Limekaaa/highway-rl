@@ -92,6 +92,13 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     train_config = copy.deepcopy(CNN_TRAIN_CONFIG)
     eval_config = copy.deepcopy(CNN_CORE_CONFIG)
 
+    # Slightly rebalance reward shaping to avoid a trivial "always FASTER" policy.
+    train_config["duration"] = 40
+    train_config["high_speed_reward"] = 0.45
+    train_config["lane_change_reward"] = -0.002
+    train_config["right_lane_reward"] = 0.05
+    train_config["normalize_reward"] = False
+
     # Single source of truth: read desired temporal depth from config.
     frame_stack = int(train_config["observation"].get("stack_size", 4))
 
@@ -99,6 +106,7 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     train_config["observation"]["stack_size"] = 1
     eval_config["observation"]["stack_size"] = 1
     hparams = build_cnn_hparams(args)
+    hparams["tensorboard_log"] = str(run_dir / "tb")
 
     _json_dump(run_dir / "train_config.json", train_config)
     _json_dump(run_dir / "eval_config.json", eval_config)
@@ -107,10 +115,13 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
     with (run_dir / "command.txt").open("w", encoding="utf-8") as f:
         f.write("python cnn_model.py ...\n")
 
-    # Nombre d'envs en parallèles pour le training.
-    n_envs_train = 16
+    # Number of parallel envs used for data collection.
+    n_envs_train = max(1, int(args.n_envs))
     train_env = make_vec_env(train_config, n_envs=n_envs_train, n_stack=frame_stack)
     eval_env = make_vec_env(eval_config, n_envs=1, n_stack=frame_stack)
+
+    # Interpret --eval-freq as real timesteps, convert to callback calls for VecEnv.
+    eval_freq_callback = max(1, int(args.eval_freq) // n_envs_train)
 
     model = DQN(
         policy="CnnPolicy",
@@ -129,7 +140,7 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
         eval_env,
         best_model_save_path=str(run_dir / "best_model"),
         log_path=str(run_dir / "eval_logs"),
-        eval_freq=max(1, args.eval_freq),
+        eval_freq=eval_freq_callback,
         n_eval_episodes=args.eval_episodes,
         deterministic=True,
         render=False,
@@ -142,6 +153,7 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
         total_timesteps=args.total_timesteps,
         progress_bar=not args.no_progress_bar,
         callback=callback,
+        tb_log_name="dqn_cnn",
     )
     train_seconds = time.time() - start
 
@@ -194,6 +206,7 @@ def train_cnn(args: argparse.Namespace) -> Tuple[Path, Dict[str, Any]]:
         f.write("- best_model/best_model.zip: best checkpoint from periodic eval\n")
         f.write("- checkpoints/: periodic checkpoints\n")
         f.write("- replay_buffer.pkl: replay buffer snapshot for warm restart\n")
+        f.write("- tb/: tensorboard logs (e.g. rollout/ep_rew_mean, train/loss)\n")
         f.write("- train_config.json, eval_config.json, hparams.json, metrics.json\n")
 
     train_env.close()
@@ -205,19 +218,20 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train CNN DQN on highway-env image observations.")
     parser.add_argument("--output-dir", type=str, default="results")
     parser.add_argument("--run-name", type=str, default=None)
-    parser.add_argument("--total-timesteps", type=int, default=500_000)
+    parser.add_argument("--total-timesteps", type=int, default=400_000)
+    parser.add_argument("--n-envs", type=int, default=10)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--buffer-size", type=int, default=50_000)
-    parser.add_argument("--learning-starts", type=int, default=5_000)
-    parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument("--learning-starts", type=int, default=15_000)
+    parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--train-freq", type=int, default=2)
+    parser.add_argument("--train-freq", type=int, default=4)
     parser.add_argument("--gradient-steps", type=int, default=1)
     parser.add_argument("--target-update-interval", type=int, default=5_000)
-    parser.add_argument("--exploration-fraction", type=float, default=0.5)
+    parser.add_argument("--exploration-fraction", type=float, default=0.8)
     parser.add_argument("--exploration-initial-eps", type=float, default=1.0)
-    parser.add_argument("--exploration-final-eps", type=float, default=0.05)
-    parser.add_argument("--eval-freq", type=int, default=10_000)
+    parser.add_argument("--exploration-final-eps", type=float, default=0.12)
+    parser.add_argument("--eval-freq", type=int, default=1_000)  # Real timesteps between evals.
     parser.add_argument("--eval-episodes", type=int, default=20)
     parser.add_argument("--checkpoint-freq", type=int, default=25_000)
     parser.add_argument("--seed", type=int, default=42)
