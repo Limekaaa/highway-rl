@@ -1,9 +1,12 @@
+import os
+from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 
 import matplotlib.pyplot as plt
 import numpy as np
 from gymnasium import Env
 from IPython.display import clear_output
+from tqdm import tqdm
 
 
 def run_one_episode(env: Env, agent, display=True, seed=None):
@@ -16,7 +19,8 @@ def run_one_episode(env: Env, agent, display=True, seed=None):
 
     while not done:
         action = agent.get_action(state, 0)
-        state, reward, done, _, _ = display_env.step(action)
+        state, reward, terminated, truncated, _ = display_env.step(action)
+        done = terminated or truncated
         rewards += reward
         length += 1
         if display:
@@ -25,11 +29,17 @@ def run_one_episode(env: Env, agent, display=True, seed=None):
             plt.show()
     if display:
         display_env.close()
-    print(f"Episode reward={rewards:.2f}, length={length}")
+        print(f"Episode reward={rewards:.2f}, length={length}")
     return rewards, length
 
 
-def eval_agent(env: Env, agent, n_sim: int | None = 5, seeds: list[int] | None = None):
+def eval_agent(
+    env: Env,
+    agent,
+    n_sim: int | None = None,
+    seeds: list[int] | None = None,
+    show_progress: bool = False,
+):
     """
     Monte Carlo evaluation.
 
@@ -39,20 +49,21 @@ def eval_agent(env: Env, agent, n_sim: int | None = 5, seeds: list[int] | None =
         * Store the sum of rewards in the episode_rewards array.
     """
     env_copy = deepcopy(env)
-    episode_rewards = np.zeros(n_sim)
-    episode_lengths = np.zeros(n_sim)
 
     seeds = seeds if seeds is not None else [None] * n_sim
+    episode_rewards = np.zeros(len(seeds))
+    episode_lengths = np.zeros(len(seeds))
 
-    for i, seed in enumerate(seeds):
-        state, _ = env_copy.reset(seed=seed)
-        reward_sum = 0
-        done = False
-        while not done:
-            action = agent.get_action(state, 0)
-            state, reward, terminated, truncated, _ = env_copy.step(action)
-            reward_sum += reward
-            episode_lengths[i] += 1
-            done = terminated or truncated
-        episode_rewards[i] = reward_sum
+    bar = tqdm(
+        enumerate(seeds),
+        desc="Evaluating",
+        disable=not show_progress,
+        unit="ep",
+        total=len(seeds),
+    )
+
+    for i, seed in bar:
+        episode_rewards[i], episode_lengths[i] = run_one_episode(
+            env_copy, agent, display=False, seed=seed
+        )
     return episode_rewards, episode_lengths

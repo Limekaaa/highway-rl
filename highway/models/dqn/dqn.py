@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
 from highway.models.dqn.mlp import QNetwork
 from highway.models.dqn.replay_buffer import ReplayBuffer
 
@@ -146,6 +145,4 @@ class DQN:
 
         self.epsilon = self.epsilon_start
         self.n_steps = 0
-        self.n_eps = 0
-        self.n_eps = 0
         self.n_eps = 0

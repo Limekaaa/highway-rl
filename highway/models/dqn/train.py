@@ -13,7 +13,7 @@ from highway.models.dqn.dqn import DQN
 from highway.scripts.environment import ConfigType, get_env
 from highway.scripts.run import eval_agent
 from highway.scripts.seed import set_seed
-from shared_core_config import TEST_CONFIG
+from shared_core_config import SHARED_CORE_CONFIG, TEST_CONFIG
 from tqdm import tqdm
 
 
@@ -32,6 +32,7 @@ def train(
     reward_threshold: int = float("inf"),
     use_tqdm: bool = True,
     logger: Logger = None,
+    date_str: str = "",
 ):
     total_time = 0
     state, _ = env.reset()
@@ -78,8 +79,23 @@ def train(
                         time_per_episode,
                     )
 
-                if cur_reward >= reward_threshold:
-                    break
+            # Save every 10 times the eval_every
+            if (ep + 1) % (10 * eval_every) == 0:
+                os.makedirs(os.path.join("model_weights", "dqn"), exist_ok=True)
+                # Save current model and optimizer state
+                torch.save(
+                    {
+                        "model_state_dict": agent.q_net.state_dict(),
+                        "optimizer_state_dict": agent.optimizer.state_dict(),
+                        "episode": ep,
+                        "reward": cur_reward,
+                    },
+                    os.path.join(
+                        "model_weights",
+                        "dqn",
+                        f"dqn_checkpoint{"" if not date_str else f"_{date_str}"}_ep{ep+1}_reward{cur_reward:.2f}.pth",
+                    ),
+                )
 
             mean_reward = np.mean(all_rewards[-5:]) if len(all_rewards) > 0 else 0
             mean_length = np.mean(all_lengths[-5:]) if len(all_lengths) > 0 else 0
@@ -96,6 +112,9 @@ def train(
             if mean_reward > best_reward:
                 best_reward = mean_reward
                 best_model_state = deepcopy(agent.q_net.state_dict())
+
+            if cur_reward >= reward_threshold:
+                break
 
     except KeyboardInterrupt:
         message = "Training interrupted by user."
@@ -154,7 +173,12 @@ if __name__ == "__main__":
 
     # Train the agent
     losses, rewards, lengths, best_model_state = train(
-        env, agent, use_tqdm=False, logger=logger, **train_config._asdict()
+        env,
+        agent,
+        use_tqdm=False,
+        logger=logger,
+        date_str=date_str,
+        **train_config._asdict(),
     )
 
     # Save the best model
@@ -172,15 +196,20 @@ if __name__ == "__main__":
 
     # Save other results
     logger.info("Saving training results...")
-    os.makedirs(os.path.join("results", "dqn"), exist_ok=True)
+    os.makedirs(os.path.join("results", "dqn", "loss"), exist_ok=True)
+    os.makedirs(os.path.join("results", "dqn", "reward"), exist_ok=True)
+    os.makedirs(os.path.join("results", "dqn", "length"), exist_ok=True)
     np.save(
-        os.path.join("results", "dqn", f"dqn_losses_{date_str}.npy"), np.array(losses)
+        os.path.join("results", "dqn", "loss", f"dqn_losses_{date_str}.npy"),
+        np.array(losses),
     )
     np.save(
-        os.path.join("results", "dqn", f"dqn_rewards_{date_str}.npy"), np.array(rewards)
+        os.path.join("results", "dqn", "reward", f"dqn_rewards_{date_str}.npy"),
+        np.array(rewards),
     )
     np.save(
-        os.path.join("results", "dqn", f"dqn_lengths_{date_str}.npy"), np.array(lengths)
+        os.path.join("results", "dqn", "length", f"dqn_lengths_{date_str}.npy"),
+        np.array(lengths),
     )
 
     logger.info("Training completed.")
