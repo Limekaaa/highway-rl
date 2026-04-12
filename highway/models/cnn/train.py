@@ -13,7 +13,7 @@ import highway_env  # noqa: F401
 
 from highway.models.cnn.config import DqnConfig, DqnTrainConfig
 from highway.scripts.environment import ConfigType, get_env
-from shared_core_config import CNN_EVAL_CONFIG
+from shared_core_config import CNN_TEST_CONFIG
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and record a DQN on highway-env from images observation and CNNpolicy.")
@@ -39,9 +39,9 @@ if __name__ == "__main__":
     
     # Eval callback
     with (output_root / "eval_config.json").open("w", encoding="utf-8") as f:
-        json.dump(CNN_EVAL_CONFIG, f, indent=2)
+        json.dump(CNN_TEST_CONFIG, f, indent=2)
     
-    eval_env = DummyVecEnv([lambda: Monitor(get_env(config_type=ConfigType.EVAL_CNN))])
+    eval_env = DummyVecEnv([lambda: Monitor(get_env(config_type=ConfigType.TEST_CNN))])
     eval_callback = EvalCallback(
         eval_env,
         best_model_save_path=str(best_model_dir),
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     # Train
     model = DQN(
         "CnnPolicy",
-        DummyVecEnv([lambda: get_env(config_type=ConfigType.TEST_CNN)]),
+        DummyVecEnv([lambda: get_env(config_type=ConfigType.TRAIN_CNN)]),
         learning_rate=config_model.learning_rate,
         buffer_size=config_model.buffer_size,
         learning_starts=config_model.learning_starts,
