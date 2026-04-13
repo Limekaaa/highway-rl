@@ -9,8 +9,12 @@ from IPython.display import clear_output
 from tqdm import tqdm
 
 
-def run_one_episode(env: Env, agent, display=True, seed=None):
-    display_env = deepcopy(env)
+def run_one_episode(env: Env, agent, display=True, seed=None, make_deep_copy=True):
+    if make_deep_copy:
+        display_env = deepcopy(env)
+    else :
+        display_env = env
+        
     done = False
     state, _ = display_env.reset(seed=seed)
 
@@ -39,6 +43,7 @@ def eval_agent(
     n_sim: int | None = None,
     seeds: list[int] | None = None,
     show_progress: bool = False,
+    make_deep_copy: bool = True,
 ):
     """
     Monte Carlo evaluation.
@@ -48,8 +53,11 @@ def eval_agent(
         * Compute the sum of rewards in this episode
         * Store the sum of rewards in the episode_rewards array.
     """
-    env_copy = deepcopy(env)
-
+    if make_deep_copy:
+        env_copy = deepcopy(env)
+    else :
+        env_copy = env
+        
     seeds = seeds if seeds is not None else [None] * n_sim
     episode_rewards = np.zeros(len(seeds))
     episode_lengths = np.zeros(len(seeds))
@@ -64,6 +72,6 @@ def eval_agent(
 
     for i, seed in bar:
         episode_rewards[i], episode_lengths[i] = run_one_episode(
-            env_copy, agent, display=False, seed=seed
+            env_copy, agent, display=False, seed=seed, make_deep_copy=make_deep_copy
         )
     return episode_rewards, episode_lengths

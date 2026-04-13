@@ -64,7 +64,7 @@ TEST_CONFIG = {
 }
 
 # CONFIG FOR CNN
-CNN_EVAL_CONFIG = {
+CNN_TEST_CONFIG = {
     # Different observation
     "observation": {
         "type": "GrayscaleObservation",
@@ -94,7 +94,7 @@ CNN_EVAL_CONFIG = {
     "offroad_terminal": True,
 }
 
-CNN_TEST_CONFIG = {
+CNN_TRAIN_CONFIG = {
     "observation": {
         "type": "GrayscaleObservation",
         "observation_shape": (128, 64),

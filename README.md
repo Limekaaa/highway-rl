@@ -110,6 +110,8 @@ Sorties générées (dans output-root):
 
 - dqn_analysis.ipynb: baselines, chargement des modèles DQN, distributions reward/length, intervalles de confiance.
 - cnn_analysis.ipynb: analyse dédiée au pipeline CNN.
+- Les fonctions d'analyse (plotting, statistiques, chargement d'artefacts, wrapper agent SB3) sont importées depuis `highway/scripts/utils`.
+- Pour l'analyse CNN en notebook: privilégier `SB3DQN.load(..., device="cpu", custom_objects={"buffer_size": 1})` pour limiter la mémoire, et utiliser `make_deep_copy=False` dans `run_one_episode`/`eval_agent`.
 
 #### Option B: TensorBoard pour DQN CNN
 
@@ -127,6 +129,7 @@ Arborescence logique:
 		- cnn/: DQN SB3 avec CnnPolicy
 		- random_agent/ et idle_agent/: baselines
 	- scripts/: création d'environnement, exécution et évaluation d'un agent
+		- utils/: fonctions partagées pour notebooks (`plotting.py`, `statistics.py`, `paths.py`, `agents.py`)
 - shared_core_config.py: configurations d'environnement partagées et variantes CNN
 - dqn_analysis.ipynb / cnn_analysis.ipynb: analyses expérimentales
 - requirements.txt: dépendances Python

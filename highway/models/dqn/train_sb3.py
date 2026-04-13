@@ -11,13 +11,13 @@ from stable_baselines3.common.monitor import Monitor
 
 import highway_env  # noqa: F401
 
-from highway.models.cnn.config import DqnConfig, DqnTrainConfig
+from highway.models.dqn.config import DqnConfig, DqnTrainConfig
 from highway.scripts.environment import ConfigType, get_env
-from shared_core_config import CNN_TEST_CONFIG
+from shared_core_config import TEST, SHARED_CORE_CONFIG
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train and record a DQN on highway-env from images observation and CNNpolicy.")
-    parser.add_argument("--output-root", type=str, default=r"./outputs_cnn_dqn/", help="Root directory for outputs (model, tensorboard logs).")
+    parser = argparse.ArgumentParser(description="Train and record a DQN on highway-env from kinematics observations and MLP policy.")
+    parser.add_argument("--output-root", type=str, default=r"./outputs_mlp_dqn/", help="Root directory for outputs (model, tensorboard logs).")
     args = parser.parse_args()
 
     output_root = Path(args.output_root)
@@ -39,15 +39,15 @@ if __name__ == "__main__":
     
     # Eval callback
     with (output_root / "eval_config.json").open("w", encoding="utf-8") as f:
-        json.dump(CNN_TEST_CONFIG, f, indent=2)
+        json.dump(SHARED_CORE_CONFIG, f, indent=2)
     
-    eval_env = DummyVecEnv([lambda: Monitor(get_env(config_type=ConfigType.TEST_CNN))])
+    eval_env = DummyVecEnv([lambda: Monitor(get_env(config_type=ConfigType.SHARED_CORE))])
     eval_callback = EvalCallback(
         eval_env,
         best_model_save_path=str(best_model_dir),
         log_path=str(eval_logs_dir),
-        eval_freq=1000,
-        n_eval_episodes=10,
+        eval_freq=100,
+        n_eval_episodes=3,
         deterministic=True,
         render=False,
         verbose=1,
@@ -55,23 +55,11 @@ if __name__ == "__main__":
     
     # Train
     model = DQN(
-        "CnnPolicy",
-        DummyVecEnv([lambda: get_env(config_type=ConfigType.TRAIN_CNN)]),
-        learning_rate=config_model.learning_rate,
-        buffer_size=config_model.buffer_size,
-        learning_starts=config_model.learning_starts,
-        batch_size=config_model.batch_size,
-        gamma=config_model.gamma,
-        train_freq=config_model.train_freq,
-        gradient_steps=config_model.gradient_steps,
-        optimize_memory_usage=config_model.optimize_memory_usage,
+        "MlpPolicy",
+        DummyVecEnv([lambda: get_env(config_type=ConfigType.TEST)]),
         replay_buffer_kwargs={"handle_timeout_termination": False},
-        target_update_interval=config_model.target_update_interval,
-        exploration_fraction=config_model.exploration_fraction,
-        verbose=config_model.verbose,
-        tensorboard_log=str(tb_dir),
     )
-    model.learn(total_timesteps=config_train.total_timestamps, 
+    model.learn(total_timesteps=50_000, 
                 tb_log_name=config_train.tb_log_name, 
                 log_interval=config_train.log_interval,
                 callback=eval_callback,)
