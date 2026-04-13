@@ -6,8 +6,8 @@ class DqnConfig(NamedTuple):
     Configuration for the DQN agent.
     """
 
-    gamma: float = 0.85
-    batch_size: int = 32
+    gamma: float = 0.9
+    batch_size: int = 64
     buffer_capacity: int = 15_000
     update_target_every: int = 100
 
@@ -15,7 +15,7 @@ class DqnConfig(NamedTuple):
     decrease_epsilon_factor: int = 100
     epsilon_min: float = 0.05
 
-    learning_rate: float = 1e-4
+    learning_rate: float = 5e-4
 
 
 class DqnTrainConfig(NamedTuple):
@@ -25,5 +25,5 @@ class DqnTrainConfig(NamedTuple):
 
     n_episodes: int = 10000
     eval_every: int = 50
-    reward_threshold: float = 38
+    reward_threshold: float = 29.5
     n_sim_per_eval: int = 20

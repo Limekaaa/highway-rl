@@ -51,7 +51,7 @@ TEST_CONFIG = {
     "vehicles_count": 45,
     "controlled_vehicles": 1,
     "initial_lane_id": None,
-    "duration": 40,
+    "duration": 30,
     "ego_spacing": 2,
     "vehicles_density": 1.0,
     "collision_reward": -10,
@@ -59,7 +59,7 @@ TEST_CONFIG = {
     "high_speed_reward": 1,
     "lane_change_reward": -0.1,
     "reward_speed_range": [22, 30],
-    "normalize_reward": False,
+    "normalize_reward": True,
     "offroad_terminal": True,
 }
 

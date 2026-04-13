@@ -8,13 +8,14 @@ from logging import INFO, FileHandler, Formatter, Logger, getLogger
 import numpy as np
 import torch
 from gymnasium import Env
+from tqdm import tqdm
+
 from highway.models.dqn.config import DqnConfig, DqnTrainConfig
 from highway.models.dqn.dqn import DQN
 from highway.scripts.environment import ConfigType, get_env
 from highway.scripts.run import eval_agent
 from highway.scripts.seed import set_seed
 from shared_core_config import SHARED_CORE_CONFIG, TEST_CONFIG
-from tqdm import tqdm
 
 
 class LoggingMode(Enum):
@@ -27,9 +28,9 @@ def train(
     env: Env,
     agent: DQN,
     n_episodes: int,
-    eval_every: int = 100,
-    n_sim_per_eval: int = 3,
-    reward_threshold: int = float("inf"),
+    eval_every: int,
+    n_sim_per_eval: int,
+    reward_threshold: int,
     use_tqdm: bool = True,
     logger: Logger = None,
     date_str: str = "",
@@ -38,6 +39,7 @@ def train(
     state, _ = env.reset()
     losses, all_rewards, all_lengths = [], [], []
     best_reward, best_model_state = -float("inf"), None
+    eval_env = get_env(config_type=ConfigType.SHARED_CORE)
     start = time.time()
 
     bar = tqdm(range(n_episodes), desc="Training", disable=not use_tqdm, unit="ep")
@@ -59,7 +61,7 @@ def train(
                 total_time += 1
 
             if ep % eval_every == 0 or ep == n_episodes - 1:
-                rewards, lengths = eval_agent(env, agent, n_sim=n_sim_per_eval)
+                rewards, lengths = eval_agent(eval_env, agent, n_sim=n_sim_per_eval)
                 cur_reward = np.mean(rewards)
                 cur_length = np.mean(lengths)
                 all_rewards.append(cur_reward)
