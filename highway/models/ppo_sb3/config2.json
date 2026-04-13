@@ -1,0 +1,21 @@
+{
+    "seed": 2,
+    "total_timesteps": 300000,
+    "eval_freq": 5000,
+    "eval_episodes": 10,
+    "save_freq": 5000,
+    "log_dir": "logs/ppo_sb3_seed2",
+    "agent_config": {
+        "learning_rate": 3e-4,
+        "n_steps": 2048,
+        "batch_size": 64,
+        "n_epochs": 10,
+        "gamma": 0.99,
+        "gae_lambda": 0.95,
+        "clip_range": 0.2,
+        "ent_coef": 0.0,
+        "verbose": 1,
+        "device": "cpu",
+        "tensorboard_log": "logs/ppo_sb3/tensorboard"
+    }
+}
