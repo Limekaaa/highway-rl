@@ -11,7 +11,13 @@ from stable_baselines3.common.monitor import Monitor
 
 import highway_env  # noqa: F401
 
-from highway.models.cnn.config import DqnConfig, DqnTrainConfig
+try:
+    # Prefer package import when run as a module: python -m highway.models.dqn_cnn_sb3.train
+    from .config import DqnConfig, DqnTrainConfig
+except ImportError:
+    # Fallback when run as a script from this folder.
+    from config import DqnConfig, DqnTrainConfig
+
 from highway.scripts.environment import ConfigType, get_env
 from shared_core_config import CNN_TEST_CONFIG
 

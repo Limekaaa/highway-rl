@@ -8,7 +8,7 @@ Ce dépôt explore des agents RL dans un environnement de type autoroute (highwa
 
 - Baselines simples: agent aléatoire et agent inactif.
 - DQN maison sur observations cinématiques (type Kinematics).
-- DQN avec politique CNN (Stable-Baselines3) sur observations image en niveaux de gris (GrayscaleObservation).
+- Agents Stable-Baselines3 (DQN/PPO): politiques MLP sur observations cinématiques (Kinematics) et politiques CNN sur observations image en niveaux de gris (GrayscaleObservation).
 
 L'objectif est de comparer la qualité des politiques, leur robustesse et leurs profils d'apprentissage selon la représentation d'état utilisée.
 
@@ -35,6 +35,34 @@ Ce pipeline est codé dans:
 - highway/models/dqn/train.py
 - highway/models/dqn/config.py
 
+### DQN SB3 (observation cinématique)
+
+Implémentation basée sur Stable-Baselines3:
+
+- Politique: MlpPolicy.
+- Observation: Kinematics.
+- Logs: `logs/dqn_sb3/` (csv, checkpoints, best_model, tensorboard optionnel via config).
+
+Lancer l'entraînement avec : 
+
+```powershell
+python -m highway.models.dqn_sb3.train
+```
+
+### PPO SB3 (observation cinématique)
+
+Implémentation basée sur Stable-Baselines3:
+
+- Politique: MlpPolicy.
+- Observation: Kinematics.
+- Logs: `logs/mlp_ppo_sb3/` (ou autre dossier selon `log_dir` dans le config).
+
+Lancer l'entraînement avec : 
+
+```powershell
+python -m highway.models.mlp_ppo_sb3.train
+```
+
 ### DQN CNN (observation grayscale)
 
 Implémentation basée sur Stable-Baselines3:
@@ -45,18 +73,32 @@ Implémentation basée sur Stable-Baselines3:
 
 Ce pipeline est codé dans:
 
-- highway/models/cnn/train.py
-- highway/models/cnn/config.py
-- shared_core_config.py (CNN_TEST_CONFIG, CNN_EVAL_CONFIG)
+- highway/models/dqn_cnn_sb3/train.py
+- highway/models/dqn_cnn_sb3/config.py
+- shared_core_config.py (CNN_TEST_CONFIG, CNN_TRAIN_CONFIG)
+
+### PPO CNN (observation grayscale)
+
+Implémentation basée sur Stable-Baselines3:
+
+- Politique: CnnPolicy.
+- Observation: GrayscaleObservation.
+- Évaluation périodique: EvalCallback avec sauvegarde du meilleur modèle.
+
+Ce pipeline est codé dans:
+
+- highway/models/cnn_ppo_sb3/train.py
+- highway/models/cnn_ppo_sb3/config.py
+- shared_core_config.py (CNN_TEST_CONFIG, CNN_TRAIN_CONFIG)
 
 ## 3. Environnements et configurations
 
 La création d'environnement est centralisée dans highway/scripts/environment.py via ConfigType:
 
 - SHARED_CORE: configuration de base commune.
-- TEST: configuration utilisée pour l'entraînement/évaluation DQN cinématique.
-- TEST_CNN: configuration d'entraînement pour DQN CNN.
-- EVAL_CNN: configuration d'évaluation pour DQN CNN.
+- TEST: configuration utilisée pour l'entraînement/évaluation sur observations cinématiques.
+- TRAIN_CNN: configuration d'entraînement pour les pipelines CNN.
+- TEST_CNN: configuration d'évaluation/test pour les pipelines CNN.
 
 Les paramètres principaux sont définis dans:
 
@@ -92,7 +134,7 @@ Sorties générées:
 #### DQN CNN (Stable-Baselines3)
 
 ```powershell
-python -m highway.models.cnn.train
+python -m highway.models.dqn_cnn_sb3.train
 ```
 
 Sorties générées (dans output-root):
@@ -109,7 +151,9 @@ Sorties générées (dans output-root):
 #### Option A: Notebooks d'analyse
 
 - dqn_analysis.ipynb: baselines, chargement des modèles DQN, distributions reward/length, intervalles de confiance.
-- cnn_analysis.ipynb: analyse dédiée au pipeline CNN.
+- cnn_analysis.ipynb: analyse dédiée au pipeline DQN CNN.
+- ppo_sb3_analysis.ipynb: analyse dédiée au pipeline PPO (MlpPolicy).
+- ppo_cnn_analysis.ipynb: analyse dédiée au pipeline PPO CNN.
 - Les fonctions d'analyse (plotting, statistiques, chargement d'artefacts, wrapper agent SB3) sont importées depuis `highway/scripts/utils`.
 - Pour l'analyse CNN en notebook: privilégier `SB3DQN.load(..., device="cpu", custom_objects={"buffer_size": 1})` pour limiter la mémoire, et utiliser `make_deep_copy=False` dans `run_one_episode`/`eval_agent`.
 
@@ -126,12 +170,15 @@ Arborescence logique:
 - highway/
 	- models/
 		- dqn/: DQN custom (réseau MLP, buffer, entraînement)
-		- cnn/: DQN SB3 avec CnnPolicy
+		- dqn_sb3/: DQN Stable-Baselines3 (MlpPolicy)
+		- mlp_ppo_sb3/: PPO Stable-Baselines3 (MlpPolicy)
+		- dqn_cnn_sb3/: DQN Stable-Baselines3 (CnnPolicy)
+		- cnn_ppo_sb3/: PPO Stable-Baselines3 (CnnPolicy)
 		- random_agent/ et idle_agent/: baselines
 	- scripts/: création d'environnement, exécution et évaluation d'un agent
 		- utils/: fonctions partagées pour notebooks (`plotting.py`, `statistics.py`, `paths.py`, `agents.py`)
 - shared_core_config.py: configurations d'environnement partagées et variantes CNN
-- dqn_analysis.ipynb / cnn_analysis.ipynb: analyses expérimentales
+- dqn_analysis.ipynb / cnn_analysis.ipynb / ppo_sb3_analysis.ipynb / ppo_cnn_analysis.ipynb: analyses expérimentales
 - requirements.txt: dépendances Python
 
 ## 7. Reproductibilité
