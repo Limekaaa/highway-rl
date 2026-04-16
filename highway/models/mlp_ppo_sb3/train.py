@@ -29,8 +29,6 @@ from stable_baselines3.common.logger import configure
 try:
     from shared_core_config import SHARED_CORE_ENV_ID, SHARED_CORE_CONFIG, TEST_CONFIG
 except ModuleNotFoundError:
-    # When running as a script (python highway/models/ppo_sb3/train.py), the repo root
-    # isn't on sys.path; add it so shared_core_config.py can be imported.
     repo_root = Path(__file__).resolve().parents[3]
     sys.path.insert(0, str(repo_root))
     from shared_core_config import SHARED_CORE_ENV_ID, SHARED_CORE_CONFIG, TEST_CONFIG
@@ -39,12 +37,11 @@ def make_env(render_mode=None):
     env = gym.make(SHARED_CORE_ENV_ID, config=SHARED_CORE_CONFIG, render_mode=render_mode)
     env.reset()
     if render_mode == "rgb_array":
-        # Allow rendering in a notebook
         env.unwrapped.viewer = None
         env.unwrapped.config["offscreen_rendering"] = True
     return env
 
-from stable_baselines3.common.logger import configure # <-- Add this import
+from stable_baselines3.common.logger import configure 
 
 def train(
     config: dict = {},
@@ -61,13 +58,9 @@ def train(
     log_dir = Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Set up the SB3 Logger
-    # This tells SB3 to print to the terminal ("stdout") and save to a CSV ("csv")
-    # You can also add "tensorboard" to this list if you want Tensorboard logs
     new_logger = configure(str(log_dir), ["stdout", "csv"])
 
     train_env = make_env(render_mode=None)
-    # The Monitor wrapper still handles raw episode rewards and lengths
     train_env = Monitor(train_env, filename=str(log_dir / "train_monitor.csv"))
 
     checkpoint_callback = CheckpointCallback(
@@ -82,7 +75,6 @@ def train(
         **config.get("agent_config", {})
     )
 
-    # 2. Attach the custom logger to your agent BEFORE learning
     agent_ppo.set_logger(new_logger)
 
     agent_ppo.learn(
