@@ -29,14 +29,9 @@ class PPO_SB3:
         """
         Loads a saved SB3 model from disk and wraps it back into the PPO_SB3 class.
         """
-        # 1. Create a blank instance of PPO_SB3 bypassing the standard __init__ 
-        # (because we don't want to initialize a brand-new, untrained PPO model)
         instance = cls.__new__(cls)
-        
-        # 2. Assign the environment
         instance.env = env
         
-        # 3. Load the actual trained model from the zip file and attach it
         instance.model = PPO.load(path, env=env, **kwargs)
         
         return instance
