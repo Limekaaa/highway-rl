@@ -23,7 +23,7 @@ Ces deux agents sont évalués dans le notebook d'analyse DQN pour établir un n
 
 ### DQN (observation cinématique)
 
-Implémentation custom PyTorch:
+Implémentation d'un DQN à la main, avec les éléments suivants:
 
 - Espace d'observation: Kinematics (positions/vitesses des véhicules proches).
 - Politique d'exploration: epsilon-greedy décroissante.
@@ -35,6 +35,14 @@ Ce pipeline est codé dans:
 - highway/models/dqn/train.py
 - highway/models/dqn/config.py
 
+Pour lancer l'entraînement:
+
+```powershell
+python -m highway.models.dqn.train
+```
+
+Les logs et résultats (données d'entraînement, checkpoints et modèle final) sont enregistrés respectivement dans `logs/dqn/` et `results/dqn/`.
+
 ### DQN SB3 (observation cinématique)
 
 Implémentation basée sur Stable-Baselines3:
@@ -43,7 +51,7 @@ Implémentation basée sur Stable-Baselines3:
 - Observation: Kinematics.
 - Logs: `logs/dqn_sb3/` (csv, checkpoints, best_model, tensorboard optionnel via config).
 
-Lancer l'entraînement avec : 
+Lancer l'entraînement avec :
 
 ```powershell
 python -m highway.models.dqn_sb3.train
@@ -57,7 +65,7 @@ Implémentation basée sur Stable-Baselines3:
 - Observation: Kinematics.
 - Logs: `logs/mlp_ppo_sb3/` (ou autre dossier selon `log_dir` dans le config).
 
-Lancer l'entraînement avec : 
+Lancer l'entraînement avec :
 
 ```powershell
 python -m highway.models.mlp_ppo_sb3.train
@@ -126,10 +134,10 @@ python -m highway.models.dqn.train
 
 Sorties générées:
 
-- Modèle best: model_weights/dqn/dqn_best_model_<timestamp>.pth
-- Checkpoints: model_weights/dqn/dqn_checkpoint_<timestamp>_ep...pth
+- Modèle best: model*weights/dqn/dqn_best_model*<timestamp>.pth
+- Checkpoints: model*weights/dqn/dqn_checkpoint*<timestamp>\_ep...pth
 - Courbes numpy: results/dqn/loss, results/dqn/reward, results/dqn/length
-- Logs texte: logs/dqn/DQN_Training_<timestamp>.log
+- Logs texte: logs/dqn/DQN*Training*<timestamp>.log
 
 #### DQN CNN (Stable-Baselines3)
 
@@ -168,15 +176,15 @@ tensorboard --logdir outputs_cnn_dqn/tb
 Arborescence logique:
 
 - highway/
-	- models/
-		- dqn/: DQN custom (réseau MLP, buffer, entraînement)
-		- dqn_sb3/: DQN Stable-Baselines3 (MlpPolicy)
-		- mlp_ppo_sb3/: PPO Stable-Baselines3 (MlpPolicy)
-		- dqn_cnn_sb3/: DQN Stable-Baselines3 (CnnPolicy)
-		- cnn_ppo_sb3/: PPO Stable-Baselines3 (CnnPolicy)
-		- random_agent/ et idle_agent/: baselines
-	- scripts/: création d'environnement, exécution et évaluation d'un agent
-		- utils/: fonctions partagées pour notebooks (`plotting.py`, `statistics.py`, `paths.py`, `agents.py`)
+  - models/
+    - dqn/: DQN custom (réseau MLP, buffer, entraînement)
+    - dqn_sb3/: DQN Stable-Baselines3 (MlpPolicy)
+    - mlp_ppo_sb3/: PPO Stable-Baselines3 (MlpPolicy)
+    - dqn_cnn_sb3/: DQN Stable-Baselines3 (CnnPolicy)
+    - cnn_ppo_sb3/: PPO Stable-Baselines3 (CnnPolicy)
+    - random_agent/ et idle_agent/: baselines
+  - scripts/: création d'environnement, exécution et évaluation d'un agent
+    - utils/: fonctions partagées pour notebooks (`plotting.py`, `statistics.py`, `paths.py`, `agents.py`)
 - shared_core_config.py: configurations d'environnement partagées et variantes CNN
 - dqn_analysis.ipynb / cnn_analysis.ipynb / ppo_sb3_analysis.ipynb / ppo_cnn_analysis.ipynb: analyses expérimentales
 - requirements.txt: dépendances Python
@@ -187,9 +195,9 @@ Arborescence logique:
 - Pour comparer des runs, conservez le timestamp des modèles et les fichiers .npy/.npz associés.
 - Préférez des évaluations multi-seeds (déjà présent dans dqn_analysis.ipynb) pour éviter les conclusions sur un seul épisode.
 
-
 # Project members
-- [Alexandre Faure](https://github.com/alexandre-faure) : alexandre.faure@student-cs.fr)
+
+- [Alexandre Faure](https://github.com/alexandre-faure) : alexandre.faure@student-cs.fr
 - [Corentin Lasne](https://github.com/corentinlasne/) : corentin.lasne@student-cs.fr
 - [Maxime Hanus](https://github.com/Limekaaa/) : maxime.hanus@student-cs.fr
 - [Charles Croon](https://github.com/Ccroon17) : charles.croon@student-cs.fr
